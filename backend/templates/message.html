@@ -31,8 +31,9 @@
 <div class="messages-container">
     {% for msg in messages %}
     <div class="message-item">
-        <div class="sender">From: {{ msg.sender.name }} ({{ msg.sender.pittEmail }})</div>
-        <div class="time">{{ msg.timeStamp.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="sender">From: {{ msg.sender }} ({{ msg.email }})</div>
+        <div class="sender">PhoneNumber:{{ msg.phone }} </div>
+        <div class="time">{{ msg.timestamp}}</div>
         <div class="content">{{ msg.content }}</div>
     </div>
     {% endfor %}
