@@ -1,0 +1,99 @@
+.sell-page {
+  padding: 2rem;
+  padding-top: 100px;
+  text-align: center;
+}
+
+.sell-header {
+  margin-bottom: 2rem;
+}
+
+
+.popup-message {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #0d2149;
+  color: #fff;
+  padding: 1rem 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  font-weight: bold;
+  z-index: 1000;
+  animation: fadeInOut 3s forwards;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.sell-form {
+  max-width: 500px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.sell-form label {
+  display: flex;
+  flex-direction: column;
+  font-weight: bold;
+}
+
+.sell-form input,
+.sell-form textarea,
+.sell-form select {
+  background-color: #ffffff;
+  border: 1px solid #888;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #000;
+  outline: none;
+}
+
+.sell-form textarea {
+  resize: none;
+}
+
+.sell-form input[type=number]::-webkit-inner-spin-button,
+.sell-form input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sell-form input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.sell-form button {
+  background-color: #0d2149;
+  color: #fff;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.sell-form button:hover {
+  background-color: #1b3b70;
+}
