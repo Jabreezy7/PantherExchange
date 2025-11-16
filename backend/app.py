@@ -289,7 +289,7 @@ def delete_listing(listing_id):
     user_id = flask_session["user_id"]
     seller = session.query(Seller).get(user_id)
     # Try to delete the product
-    success, msg = seller.deleteListing(listing_id, session=session)
+    success= seller.deleteListing(listing_id, session=session)
     return redirect(url_for("my_listings"))
 
 @app.route("/my_messages")
@@ -301,7 +301,7 @@ def my_messages():
     # get message
     messages = user.reportListing(session)
     # to frontend
-    return render_template("my_messages.html", messages=messages)
+    return render_template("my_messages.html", msg=messages)
 
 
 # Route for logging out

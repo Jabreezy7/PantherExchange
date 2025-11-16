@@ -1,3 +1,4 @@
+from django.dispatch import receiver
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, relationship
 import sqlalchemy
@@ -43,8 +44,6 @@ catalog_listings = Table(
 
 class Listing(Base):
     __tablename__ ="listing"
-    id=Column(Integer, primary_key=True, autoincrement=True)
-
     # required data
     id = Column(Integer, primary_key=True, autoincrement=True)
     title = Column(String(100), nullable=False)
@@ -114,7 +113,7 @@ class Student(Base):
         if not self.inbox:
             self.inbox = Inbox(student_id=self.id)  # 关联当前学生的id
 
-        # 保存到数据库
+        # store to dataset
         session.add_all([self.buyer, self.seller, self.inbox])
         session.commit()
 
@@ -126,19 +125,19 @@ class Student(Base):
             order_by(Message.timeStamp). \
             all()
 
-        # 3. 整理消息格式，包含发送者姓名、内容、时间等（便于前端展示）
+        # 3. formatting message
         message_list = []
         for msg in received_messages:
-            # 获取发送者信息（避免只显示ID）
+            # get sender information
             sender = session.query(Student).get(msg.sender_id)
-            sender_name = sender.name if sender else "未知用户"
+            sender_name = sender.name if sender else " "
 
             message_list.append({
-                "message_id": msg.id,
                 "sender": sender_name,
-                "sender_id": msg.sender_id,
+                "email": sender.pittEmail,
+                "phone": sender.phoneNumber,
                 "content": msg.content,
-                "sent_time": msg.timeStamp.strftime("%Y-%m-%d %H:%M:%S")
+                "timestamp": msg.timeStamp.strftime("%Y-%m-%d %H:%M:%S")
             })
 
         # 4. 返回整理后的消息列表
@@ -162,8 +161,19 @@ class Buyer(Base):
         # buy it(sold)
         listing.status = "sold"
         listing.buyer_id = self.id
+
+        message_content=f"{self.student.name} bought your product {listing.title}"
+        new_message=Message(sender_id=self.id,receiver_id=listing.seller_id,content=message_content)
+        session.add(new_message)
+
+        # add message to seller inbox
+        seller = session.query(Student).get(listing.seller_id)
+        if seller and seller.inbox:
+            seller.inbox.messages.append(new_message)
+
         session.commit()
         return True
+
     def saveListing(self,listing,session):
         if listing in self.student.savedListings:
             # not save
@@ -247,6 +257,9 @@ class Message(Base):
     content = Column(Text, nullable=False)
     # default current time
     timeStamp = Column(DateTime, default=datetime.now)
+
+    sender = relationship("Student", foreign_keys=[sender_id], backref="sent_messages")
+    receiver = relationship("Student", foreign_keys=[receiver_id], backref="received_messages")
 
 class Inbox(Base):
     __tablename__ = "inbox"
