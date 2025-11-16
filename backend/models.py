@@ -258,9 +258,6 @@ class Message(Base):
     # default current time
     timeStamp = Column(DateTime, default=datetime.now)
 
-    sender = relationship("Student", foreign_keys=[sender_id], backref="sent_messages")
-    receiver = relationship("Student", foreign_keys=[receiver_id], backref="received_messages")
-
 class Inbox(Base):
     __tablename__ = "inbox"
     id = Column(Integer, primary_key=True, autoincrement=True)
