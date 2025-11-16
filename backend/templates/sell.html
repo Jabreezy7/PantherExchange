@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sell Item - Shop</title>
+</head>
+<body>
+<h1>Sell Something</h1>
+
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+
+<form method="POST">
+    <div>
+        <label>Title:</label>
+        <input type="text" name="title" required>
+    </div>
+    <div>
+        <label>About it:</label>
+        <textarea name="description" required></textarea>
+    </div>
+    <div>
+        <label>Price ($):</label>
+        <input type="number" step="0.01" name="price" required>
+    </div>
+    <div>
+        <label>Type:</label>
+        <input type="text" name="category" placeholder="e.g., books">
+    </div>
+    <button>Post</button>
+</form>
+
+<a href="/">Back to home</a>
+</body>
+</html>

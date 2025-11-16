@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Campus Second-hand Trading Platform</title>
+    <style>
+        .listing { border: 1px solid #ccc; padding: 10px; margin: 10px; }
+        .header { display: flex; justify-content: space-between; padding: 10px; background: #f5f5f5; }
+        .flash-message { color: #333; padding: 10px; margin: 10px 0; background: #e8f4f8; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>Campus Second-hand Trading Platform</h1>
+    <div>
+        {% if logged_in %}
+        <span>Welcome, {{ session.username }}</span>
+        <a href="/my_listings">My Trading Center</a>
+        <a href="/sell">Post Product</a>
+        <a href="/message">Messages</a>
+        <a href="/logout">Logout</a>
+        {% else %}
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Show flash messages here (like "Successfully logged out") -->
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+{% for message in messages %}
+<div class="flash-message">{{ message }}</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<h2>Products for Sale</h2>
+<div>
+    {% for listing in listings %}
+        {% if not logged_in or listing.seller_id != session.user_id %}
+        <div class="listing">
+            <h3><a href="/listing/{{ listing.id }}">{{ listing.title }}</a></h3>
+            <p>Price: ${{ listing.price }}</p>
+            <p>Seller: {{ listing.sellerName }}</p>
+            <p>Category: {{ listing.category }}</p>
+        </div>
+        {% endif %}
+    {% else %}
+    <p>No products available</p>
+    {% endfor %}
+</div>
+
+<h2>My Products</h2>
+<div>
+    {% for listing in listings %}
+        {% if logged_in and listing.seller_id == session.user_id %}
+        <div class="listing">
+            <h3><a href="/listing/{{ listing.id }}">{{ listing.title }}</a></h3>
+            <p>Price: ${{ listing.price }}</p>
+            <p>Seller: {{ listing.sellerName }}</p>
+            <p>Category: {{ listing.category }}</p>
+        </div>
+        {% endif %}
+    {% else %}
+    <p>No products available</p>
+    {% endfor %}
+</div>
+
+
+</body>
+</html>

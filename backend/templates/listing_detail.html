@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ listing.title }} - Shop</title>
+</head>
+<body>
+<h1>{{ listing.title }}</h1>
+
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+
+<p>Price: ${{ listing.price }}</p>
+<p>Seller: {{ listing.sellerName }}</p>
+<p>Type: {{ listing.category }}</p>
+<p>Time: {{ listing.datePosted }}</p>
+<p>Where to meet: {{ listing.address or 'No info' }}</p>
+
+<h3>About this item</h3>
+<p>{{ listing.description }}</p>
+
+{% if logged_in and not is_seller and listing.status == 'active' %}
+<form method="POST" action="/purchase/{{ listing.id }}">
+    <button>Buy</button>
+</form>
+    {% if is_saved %}
+<!--saved-->
+    <a href="/save/{{ listing.id }}">Unsave</a>
+    {% else %}
+<!--unsaved-->
+    <a href="/save/{{ listing.id }}">Save</a>
+    {% endif %}
+{% endif %}
+
+{% if is_seller %}
+<a href="/delete_listing/{{ listing.id }}">Delete</a>
+{% endif %}
+
+<a href="/">Back to home</a>
+</body>
+</html>

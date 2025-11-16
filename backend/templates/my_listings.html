@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Items - Shop</title>
+</head>
+<body>
+<h1>My Things</h1>
+
+<!-- I sold -->
+{% if seller_listings %}
+<h2>Items I sell</h2>
+{% for item in seller_listings %}
+<div>
+    <h3><a href="/listing/{{ item.id }}">{{ item.title }}</a></h3>
+    <p>Price: ${{ item.price }}</p>
+    <p>Status: {{ item.status }}</p>
+    <a href="/delete_listing/{{ item.id }}">Delete</a>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- I saved -->
+{% if saved_listings %}
+<h2>Items I saved</h2>
+{% for item in saved_listings %}
+<div>
+    <h3><a href="/listing/{{ item.id }}">{{ item.title }}</a></h3>
+    <p>Price: ${{ item.price }}</p>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if bought_listings %}
+<h2>Items I Bought</h2>
+{% for item in bought_listings %}
+<div>
+    <h3><a href="/listing/{{ item.id }}">{{ item.title }}</a></h3>
+    <p>Price: ${{ item.price }}</p>
+    <p>Seller: {{ item.sellerName }}</p>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if not seller_listings and not saved_listings %}
+<p>No items</p>
+{% endif %}
+
+<a href="/">Back to home</a>
+</body>
+</html>
