@@ -5,8 +5,8 @@ import "./BuyPage.css";
 
 
 import electronicsIcon from "../assets/images/electronic_icon.png";
-import booksIcon from "../assets/images/book_icon.jpg";
-import furnitureIcon from "../assets/images/furniture_icon.jpg";
+import booksIcon from "../assets/images/book_icon.png";
+import furnitureIcon from "../assets/images/furniture_icon.png";
 import allIcon from "../assets/images/all_icon.png";
 
 const categoryIcons = {
