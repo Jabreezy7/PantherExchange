@@ -98,7 +98,7 @@ function SellPage() {
 
         {showSuccess && (
           <div className="popup-message">
-            🎉 You have successfully created a listing!
+            You have successfully created a listing!
           </div>
         )}
 
