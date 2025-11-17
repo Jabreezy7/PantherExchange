@@ -3,7 +3,7 @@
 URL="http://localhost:5173"
 
 cd docker/
-docker compose up -d
+docker compose up --build -d
 cd ..
 
 echo "Waiting for server to be ready..."
