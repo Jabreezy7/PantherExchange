@@ -4,7 +4,7 @@
   justify-content: space-between;
   padding: 1rem 2rem;
   background-color: #fff;
-  color: #0d2149;
+  color: #003594;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   width: 100%;
   position: fixed;
@@ -50,12 +50,12 @@
 
 .sign-in-btn {
   background-color: transparent;
-  color: #0d2149;
+  color: #003594;
   border: 1px solid #0d2149;
 }
 
 .register-btn {
-  background-color: #0d2149;
+  background-color: #003594;
   color: #fff;
 }
 
