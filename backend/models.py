@@ -1,4 +1,3 @@
-#from django.dispatch import receiver
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, relationship
 import sqlalchemy
