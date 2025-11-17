@@ -1,4 +1,5 @@
 #!/bin/bash
+# Generated using Microsoft Copilot
 URL="http://localhost:5173"
 
 cd docker/
