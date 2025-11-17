@@ -1,11 +1,9 @@
-import React, { useState, useContext } from "react";
+import React, { useState } from "react";
 import Header from "../components/Header";
-import { ListingsContext } from "../context/ListingsContext";
+import { addListing as addListingAPI } from "../services/api";
 import "./SellPage.css";
 
 function SellPage() {
-  const { addListing } = useContext(ListingsContext);
-
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -13,83 +11,103 @@ function SellPage() {
   const [image, setImage] = useState(null);
   const [category, setCategory] = useState("Electronics");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const newListing = {
-      title,
-      description,
-      price: "$" + price,
-      address,
-      category,
-      image: image ? URL.createObjectURL(image) : null
-    };
+    try {
+      const formData = {
+        title,
+        description,
+        price: Number(price),
+        address,
+        category,
+        image: image ? image.name : null,
+      };
 
-    addListing(newListing);
+      await addListingAPI(formData);
 
-    setTitle("");
-    setDescription("");
-    setPrice("");
-    setAddress("");
-    setImage(null);
-    setCategory("Electronics");
+      setTitle("");
+      setDescription("");
+      setPrice("");
+      setAddress("");
+      setImage(null);
+      setCategory("Electronics");
 
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Failed to submit listing. Please try again.");
+      setTimeout(() => setErrorMessage(""), 3000);
+    }
   };
 
   return (
     <div className="sell-page">
       <Header />
 
-      <h1>Sell an Item</h1>
+      <div className="sell-page-content">
+        <h1 className="sell-header">Sell an Item</h1>
 
-      <form className="sell-form" onSubmit={handleSubmit}>
+        <form className="sell-form" onSubmit={handleSubmit}>
+          <label>
+            Product Title:
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
 
-        <label>Product Title:
-          <input value={title} onChange={e => setTitle(e.target.value)} required />
-        </label>
+          <label>
+            Description:
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} required />
+          </label>
 
-        <label>Description:
-          <textarea value={description} onChange={e => setDescription(e.target.value)} required />
-        </label>
+          <label>
+            Price ($):
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              required
+            />
+          </label>
 
-        <label>Price ($):
-          <input
-            type="number"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            required
-          />
-        </label>
+          <label>
+            Address:
+            <input value={address} onChange={(e) => setAddress(e.target.value)} required />
+          </label>
 
-        <label>Address:
-          <input value={address} onChange={e => setAddress(e.target.value)} required />
-        </label>
+          <label>
+            Image:
+            <input type="file" onChange={(e) => setImage(e.target.files[0])} />
+          </label>
 
-        <label>Image:
-          <input type="file" onChange={e => setImage(e.target.files[0])} required />
-        </label>
+          <label>
+            Category:
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option>Electronics</option>
+              <option>Books</option>
+              <option>Furniture</option>
+              <option>Clothing</option>
+              <option>Other</option>
+            </select>
+          </label>
 
-        <label>Category:
-          <select value={category} onChange={e => setCategory(e.target.value)}>
-            <option>Electronics</option>
-            <option>Books</option>
-            <option>Furniture</option>
-            <option>Clothing</option>
-            <option>Other</option>
-          </select>
-        </label>
+          <button className="submit-btn" type="submit">Submit Listing</button>
+        </form>
 
-        <button className="btn" type="submit">Submit Listing</button>
-      </form>
+        {showSuccess && (
+          <div className="popup-message">
+            🎉 You have successfully created a listing!
+          </div>
+        )}
 
-      {showSuccess && (
-        <div className="popup-message">
-          🎉 You have successfully created a listing!
-        </div>
-      )}
+        {errorMessage && (
+          <div className="popup-message" style={{ backgroundColor: "#d9534f" }}>
+            {errorMessage}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

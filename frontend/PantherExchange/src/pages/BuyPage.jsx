@@ -1,7 +1,7 @@
-import React, { useContext, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Header from "../components/Header";
-import { ListingsContext } from "../context/ListingsContext";
 import "./BuyPage.css";
+import { getListings } from "../services/api";
 
 
 import electronicsIcon from "../assets/images/electronic_icon.png";
@@ -13,19 +13,34 @@ const categoryIcons = {
   Electronics: electronicsIcon,
   Books: booksIcon,
   Furniture: furnitureIcon,
-  All: allIcon
+  All: allIcon,
 };
 
 function BuyPage() {
-  const { listings } = useContext(ListingsContext);
+  const [listings, setListings] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
-
-  const filteredListings =
-    selectedCategory === "All"
-      ? listings
-      : listings.filter(item => item.category === selectedCategory);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const categories = ["All", "Electronics", "Books", "Furniture"];
+
+  const fetchListings = async (category) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getListings(category);
+      setListings(response.data);
+    } catch (err) {
+      console.error("Error fetching listings:", err);
+      setError("Failed to load listings. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchListings(selectedCategory);
+  }, [selectedCategory]);
 
   return (
     <div className="buy-page">
@@ -35,9 +50,9 @@ function BuyPage() {
         <aside className="category-sidebar">
           <h3>Categories</h3>
           <ul>
-            {categories.map((cat, index) => (
+            {categories.map((cat) => (
               <li
-                key={index}
+                key={cat}
                 className={cat === selectedCategory ? "active" : ""}
                 onClick={() => setSelectedCategory(cat)}
               >
@@ -56,27 +71,33 @@ function BuyPage() {
 
         <main className="listing-section">
           <h1>Available Listings</h1>
-          <div className="listing-grid">
-            {filteredListings.map(item => (
-              <div className="listing-card" key={item.id}>
-                {item.image ? (
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className="listing-image"
-                  />
-                ) : (
-                  <div className="placeholder-image">No Image</div>
-                )}
 
-                <p className="price">{item.price}</p>
-                <h3>{item.title}</h3>
-                <p className="address"> {item.address}</p>
+          {loading && <p>Loading listings...</p>}
+          {error && <p className="error-message">{error}</p>}
 
-                <button className="buy-btn">Buy</button>
-              </div>
-            ))}
-          </div>
+          {!loading && !error && (
+            <div className="listing-grid">
+              {listings.map((item) => (
+                <div className="listing-card" key={item.id}>
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="listing-image"
+                    />
+                  ) : (
+                    <div className="placeholder-image">No Image</div>
+                  )}
+
+                  <p className="price">{item.price}</p>
+                  <h3>{item.title}</h3>
+                  <p className="address">{item.address}</p>
+
+                  <button className="buy-btn">Buy</button>
+                </div>
+              ))}
+            </div>
+          )}
         </main>
       </div>
     </div>
