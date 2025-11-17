@@ -1,11 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import pittLogo from "../assets/images/pitt_logo.png";
-import '../App.css';
+import "../App.css";
 import saveMoneyIcon from "../assets/images/discount_tag.png";
 import easyUseIcon from "../assets/images/minimal_icon.png";
 import trustedIcon from "../assets/images/trust_icon.png";
-
 
 function HomePage() {
   return (
@@ -14,9 +13,12 @@ function HomePage() {
         <img src={pittLogo} alt="University of Pittsburgh Logo" className="logo" />
         <h1>PantherExchange</h1>
         <p>Buy and sell items with fellow University of Pittsburgh students!</p>
-        <nav>
+
+        <nav className="home-nav">
           <Link to="/buy" className="btn">Buy Items</Link>
           <Link to="/sell" className="btn">Sell Items</Link>
+          <Link to="/login" className="btn auth-btn">Sign In</Link>
+          <Link to="/register" className="btn auth-btn">Register</Link>
         </nav>
       </header>
 
@@ -24,7 +26,6 @@ function HomePage() {
         <section className="section about">
           <h2>About PantherExchange</h2>
           <p>PantherExchange is a student-run marketplace for the University of Pittsburgh community. Safe, simple, and convenient.</p>
-
 
           <div className="info-cards">
             <div className="info-card">
@@ -45,7 +46,6 @@ function HomePage() {
               <p>Connect directly with other Pitt students for a safe and reliable transaction.</p>
             </div>
           </div>
-
         </section>
       </main>
 

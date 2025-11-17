@@ -49,7 +49,7 @@ function SellPage() {
       <Header />
 
       <div className="sell-page-content">
-        <h1 className="sell-header">Sell an Item</h1>
+        <h1 className="sell-header">Create a Listing</h1>
 
         <form className="sell-form" onSubmit={handleSubmit}>
           <label>
