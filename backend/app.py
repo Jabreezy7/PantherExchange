@@ -1,315 +1,314 @@
-# Import necessary tools from Flask framework
-from flask import Flask, render_template, request, redirect, url_for, session as flask_session, flash
-# Import models (like database tables)
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from models import *
-import os
-from datetime import datetime
 
-# Find the base folder of this file
-BASEDIR = os.path.abspath(os.path.dirname(__file__))
-# Create a Flask app
-app = Flask(
-    __name__,
-    template_folder=os.path.join(BASEDIR, "templates"),  # Where HTML files are stored
-)
-# Secret key for session (needed for user login)
-app.secret_key = "test"
+app = Flask(__name__)
+# work on different URL
+CORS(app)  
 
+# commonly used response jsonfy result
 
-# Home page route
-@app.route("/")
-def index():
-    # Get the product category from the URL (if any)
-    category = request.args.get("category")
-    # Get products based on category. If no category, get all active products.
-    if category:
-        listings = session.query(Listing).filter_by(status="active", category=category).all()
-    else:
-        listings = session.query(Listing).filter_by(status="active").all()
+# default as non-data and operation succesfully, with 200 as operate sucessful
+def success_response(data=None, msg="operate successfully"):
+    return jsonify({"success": True, "data": data or {}, "msg": msg}), 200
 
-    # Show the home page with products and login status
-    return render_template("index.html", listings=listings, logged_in="user_id" in flask_session)
+# failed due to server errors, but it depends on several situations
+def fail_response(msg="operate failed", code=400):
+    return jsonify({"success": False, "msg": msg}), code
 
 
-# User registration route (can get form or send form data)
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    # If user submits the registration form
-    if request.method == "POST":
-        # Get data from the form
-        data = {
-            "username": request.form.get("username"),
-            "email": request.form.get("email"),
-            "password": request.form.get("password"),
-            "phone": request.form.get("phone")
-        }
-        # Check if all required fields are filled
-        if not all([data["username"], data["email"], data["password"], data["phone"]]):
-            return render_template("register.html", error="Please fill in all required fields")
-        # Check if email is already used
-        if session.query(Student).filter_by(pittEmail=data["email"]).first():
-            return render_template("register.html", error="This email has been registered")
-        try:
-            # Create a new student
-            new_student = Student(
-                name=data["username"],
-                pittEmail=data["email"],
-                phoneNumber=data["phone"],
-                password=data["password"]
-            )
-            # Save the new student to database
-            session.add(new_student)
-            session.commit()  # Save changes
-            # Auto create buyer, seller and inbox for the new student
-            new_student.register(session)
-            # Go to login page with success message
-            return redirect(url_for("login", success="Registration successful, please log in"))
-        except Exception as e:
-            # If error, undo the save
-            session.rollback()
-            return render_template("register.html", error=f"Registration failed: {str(e)}")
-    # Show the registration form (if not submitting data)
-    return render_template("register.html")
 
 
-# User login route (can get form or send form data)
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    # If user submits login data
-    if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
-        # Find the student with this email
-        student = session.query(Student).filter_by(pittEmail=email).first()
-        # If no student found
+
+@app.route("/api/student/register", methods=["POST"])
+# studnet register
+def student_register():
+
+    # get data in json format
+    json_data = request.get_json()
+
+    # required text filed
+    required = ["name", "pittEmail", "phoneNumber", "password"]
+
+    # missing any type of data, return missing required field
+    for field in required:
+        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+    # make sure pitt student using it
+    pitt_email=str(json_data["pittEmail"]).strip().lower()
+    # make sure the email has valid length
+    if not pitt_email.endswith("@pitt.edu") or len(pitt_email)<=9 or len(pitt_email)>14: return fail_response("invalid email")
+    try:
+        # auto-configuration json_data to corresponding text field
+        student = Student(**json_data)
+        # add them into database session
+        session.add(student)
+        # check data based on database
+        session.commit()
+        # successfully upload it
+        return success_response({"studentId": student.id}, "registerd successfully ")
+    except Exception as e:
+        # failed, not add to database
+        print(e)
+        session.rollback()
+        # email has already being used
+        return fail_response("login failed, email has already exist", 409)
+
+@app.route("/api/student/login", methods=["POST"])
+# student login
+def student_login():
+    # get data
+    json_data = request.get_json()
+    print(json_data)
+    if not json_data.get("pittEmail") or not json_data.get("password"):
+        return fail_response("email or password can't be null")
+
+    # sql search, students with unqiue pittEmail, so they are existing or not
+    student = session.query(Student).filter_by(pittEmail=json_data["pittEmail"]).one_or_none()
+    print(student.name)
+
+    # get student email and the following password
+    if not student or not student.login(json_data["name"],json_data["password"]):
+        return fail_response("incorrect email or name or password ")
+
+    return success_response({
+        "studentId": student.id,
+        "name": student.name,
+        "pittEmail": student.pittEmail
+    }, "login successful")
+
+@app.route("/api/listing", methods=["POST"])
+# create goods
+def create_listing():
+    json_data = request.get_json()
+    required = ["studentId", "title", "description", "price", "address"]
+
+    # missing any type of data, return missing required field
+    for field in required:
+        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+    student = session.query(Student).get(json_data["studentId"])
+    if not student:
+        return fail_response("student not exist")
+
+    # make sure title and price in valid range
+    title=json_data["title"]
+    if len(str(title))>100: return fail_response("too long title, please make it shorter")
+    price=json_data["price"]
+    if int(price)<0: return fail_response("price should be a positive number")
+
+    # it includes all the required information, if not exist, within default values
+    try:
+        listing_id = student.createListing(
+            title=title,
+            description=json_data["description"],
+            price=json_data["price"],
+            address=json_data["address"],
+            category=json_data.get("category", "Books"),
+            status=json_data.get("status", "Available")
+        )
+        # succesfully created
+        return success_response({"listingId": listing_id}, "goods create suceesfully")
+    except:
+        # other failure
+        return fail_response("Other exceptions, please check the address/category/status field")
+
+@app.route("/api/listing/batch", methods=["POST"])
+# created in batch(may not implemented)
+def batch_create_listing():
+    json_data = request.get_json()
+    if not isinstance(json_data, list) or len(json_data) == 0:
+        return fail_response("please pass data in list format")
+
+    created_ids = []
+    for item in json_data:
+        required = ["studentId", "title", "description", "price", "address"]
+        for field in required:
+            if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+        student = session.query(Student).get(json_data["studentId"])
         if not student:
-            return render_template("login.html", error="This email is not registered")
-        # If password is wrong
-        if not student.login(password):
-            return render_template("login.html", error="Wrong password")
+            return fail_response("student not exist")
 
-        # Save user info in session (for login state)
-        flask_session["user_id"] = student.id
-        flask_session["username"] = student.name
-        # Every user can be both buyer and seller
-        flask_session["has_buyer_role"] = True
-        flask_session["has_seller_role"] = True
-        # Go to home page after login
-        return redirect(url_for("index"))
-    # Get success message from URL (if any)
-    success_msg = request.args.get("success")
-    # Show login form
-    return render_template("login.html", success=success_msg)
+        # make sure title and price in valid range
+        title=json_data["title"]
+        if len(str(title))>100: return fail_response("too long title, please make it shorter")
+        price=json_data["price"]
+        if int(price)<0: return fail_response("price should be a positive number")
 
-@app.route("/message")
-def message():
-    # 检查登录状态
-    if "user_id" not in flask_session:
-        return redirect(url_for("login", next="/message"))  # 登录后跳转回消息页
+        listing_id = student.createListing(
+            title=title,
+            description=item["description"],
+            price=price,
+            address=item["address"],
+            category=item.get("category", "Books")
+        )
+        created_ids.append(listing_id)
 
-    user_id = flask_session["user_id"]
-    student = session.query(Student).get(user_id)
-    if not student:
-        return redirect(url_for("index"))
+    return success_response({
+        "createdIds": created_ids,
+        "count": len(created_ids)
+    }, "created in bath successfully")
 
-    # 获取用户的所有消息
-    messages = student.reportListing(session)
-    return render_template(
-        "message.html",
-        messages=messages,
-        username=flask_session.get("username")
-    )
-
-# Route for selling products (can get form or send form data)
-@app.route("/sell", methods=["GET", "POST"])
-def sell():
-    # If user is not logged in, go to login page
-    if "user_id" not in flask_session:
-        return redirect(url_for("login"))
-    # Get current user's ID
-    user_id = flask_session["user_id"]
-    # Get current user's info
-    student = session.query(Student).get(user_id)
-    if not student:
-        return render_template("sell.html", error="User information does not exist")
-
-    # If user submits product info
-    if request.method == "POST":
-        # Get and clean image links (split by comma)
-        images = request.form.get("images", "").split(",")
-        images = [img.strip() for img in images if img.strip()]
-        # Product data from form
-        data = {
-            "title": request.form.get("title"),
-            "description": request.form.get("description"),
-            "price": request.form.get("price"),
-            "category": request.form.get("category"),
-            "address": request.form.get("address"),
-            "images": images,
-            "seller_name": student.name
-        }
-        # Create the product listing
-        new_listing= student.seller.createListing(session=session, **data)
-        if new_listing:
-            # Go to the new product's page if success
-            return redirect(url_for("listing_detail", listing_id=new_listing.id))
-        else:
-            # Show error if failed
-            return render_template("sell.html",)
-    # Show the sell form
-    return render_template("sell.html")
-
-
-
-# force listing_id be integer
-@app.route("/listing/<int:listing_id>")
-def listing_detail(listing_id):
-    # Get the product by ID
-    listing = session.query(Listing).get(listing_id)
-    if not listing:
-        return "Product does not exist", 404  # Error if product not found
-
-    # Check user login state
-    logged_in = "user_id" in flask_session
-    user_id = flask_session.get("user_id")
-    # Check if current user is the seller of this product
-    is_seller = logged_in and (listing.seller_id == user_id)
-    # Check if user saved this product
-    is_saved = False
-
-    # If user is logged in, check saved products
-    if logged_in:
-        student = session.query(Student).get(user_id)
-        for item in student.savedListings:
-            print(item.id," ",listing_id)
-            if item.id==listing_id:
-                is_saved=True
-                break
-
-    # Show product detail page with all info
-    return render_template(
-        "listing_detail.html",
-        listing=listing,
-        logged_in=logged_in,
-        is_seller=is_seller,
-        is_saved=is_saved
-    )
-
-
-# Route for buying a product
-@app.route("/purchase/<listing_id>", methods=["POST"])
-def purchase(listing_id):
-    # If not logged in, go to login
-    if "user_id" not in flask_session:
-        return redirect(url_for("login"))
-    user_id = flask_session["user_id"]
-    student = session.query(Student).get(user_id)
-    listing = session.query(Listing).get(listing_id)
-    # Check if product can be bought
-    if not listing or listing.status != "active":
-        return render_template("listing_detail.html", listing=listing, error="Product cannot be purchased")
-
-    # Try to purchase the product
-    success = student.buyer.purchaseItem(listing, session=session)
-    if success:
-        # Show success page if purchase works
-        return render_template("purchase_success.html", listing=listing)
-    else:
-        # Show error if purchase fails
-        return render_template("listing_detail.html", listing=listing, error="failed")
-
-# Route for saving a product (to favorites)
-@app.route("/save/<listing_id>")
-def save_listing(listing_id):
-    # If not logged in, go to login
-    if "user_id" not in flask_session:
-        return redirect(url_for("login"))
-
-    user_id = flask_session["user_id"]
-    student = session.query(Student).get(user_id)
-    listing = session.query(Listing).get(listing_id)
-
-    if not listing:
-        return redirect(url_for("index"))
-
-    # Make sure the user has a buyer role (create if not)
-    if not student.buyer:
-        try:
-            student.buyer = Buyer(id=user_id)
-            session.commit()
-            flask_session["has_buyer_role"] = True
-        except Exception as e:
-            session.rollback()
-            return render_template("listing_detail.html", listing=listing, error=f"Failed to create buyer role: {str(e)}")
-
-    # Save or unsave the product
-    student.buyer.saveListing(listing, session=session)
-
-    return redirect(url_for("listing_detail", listing_id=listing_id))
-
-
-# Route for user's own products and saved products
-@app.route("/my_listings")
-def my_listings():
-    # If not logged in, go to login
-    if "user_id" not in flask_session:
-        return redirect(url_for("login"))
-
-    user_id = flask_session["user_id"]
-    data = {
-        "seller_listings": [],  # Products user is selling
-        "saved_listings": [],   # Products user saved
-        "bought_listings": [],  # Products user bought
-    }
-
-    student = session.query(Student).get(user_id)
-    # Get products the user is selling (if they have seller role)
-    if flask_session.get("has_seller_role"):
-        data["seller_listings"] = session.query(Listing).filter_by(seller_id=user_id).all()
-
-    # Get products the user saved (if they have buyer role)
-    if flask_session.get("has_buyer_role"):
-        for item in student.savedListings:
-            if item.status=="active":
-                data["saved_listings"].append(item);
-
-    data["bought_listings"] = session.query(Listing).filter_by(buyer_id=user_id).all()
-
-    # Show the page with user's products
-    return render_template("my_listings.html", **data)
-
-
-# Route for deleting a product listing
-@app.route("/delete_listing/<listing_id>")
+@app.route("/api/listing/<int:listing_id>", methods=["DELETE"])
+# delete products
 def delete_listing(listing_id):
-    # Check if user is logged in and has seller role
-    if "user_id" not in flask_session or not flask_session.get("has_seller_role"):
-        return redirect(url_for("login"))
+    json_data = request.get_json()
+    student_id = json_data.get("studentId")
+    if not student_id:
+        return fail_response("no student id")
 
-    user_id = flask_session["user_id"]
-    seller = session.query(Seller).get(user_id)
-    # Try to delete the product
-    success= seller.deleteListing(listing_id, session=session)
-    return redirect(url_for("my_listings"))
+    # get data based on student_id and product id
+    student = session.query(Student).get(student_id)
+    if not student:
+        return fail_response("student doesn't exist")
 
-@app.route("/my_messages")
-def my_messages():
-    if "user_id" not in flask_session:
-        return redirect(url_for("login"))
-    # get login user
-    user = session.query(Student).get(flask_session["user_id"])
-    # get message
-    messages = user.reportListing(session)
-    # to frontend
-    return render_template("my_messages.html", msg=messages)
+    try:
+        success = student.deleteListing(listing_id)
+        return success_response("delete successfully") if success else fail_response("delete failed")
+
+    # it could be either invalid student id or invalid product_id(but actually it shouldn't exist)
+    except Exception as e:
+        session.rollback()
+        return fail_response(f"delete failed：{str(e)}")
+
+@app.route("/api/listing/tag", methods=["POST"])
+# make tags on product
+def tag_listing():
+    json_data = request.get_json()
+    required = ["studentId", "listingId", "tags"]
+    for field in required:
+        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+    student = session.query(Student).get(json_data["studentId"])
+    if not student:
+        return fail_response("student not exist")
+
+    try:
+        success = student.tagListing(json_data["listingId"], json_data["tags"])
+        return success_response("sucessfully make tags") if success else fail_response("failed to make tags")
+    except:
+        session.rollback()
+        return fail_response("failed to create tag")
 
 
-# Route for logging out
-@app.route("/logout")
-def logout():
-    # Clear all session data (end login state)
-    flask_session.clear()
-    return redirect(url_for("index"))  # Go to home page after logout
+@app.route("/api/listing", methods=["GET"])
+# check for all data while no login
+def get_listings():
+    # select all of the data, no matter login or not
+    catalog = ListingCatalog(query="all")
+    listings = catalog.listings
+    return success_response({"listings": listings, "count": len(listings)},"search successfully")
+
+@app.route("/api/listing/<int:studentId>", methods=["GET"])
+# check for all data while login
+def get_listing_studentId(studentId):
+    sql=text("select * from listing where seller != :id")
+    catalog = session.execute(sql,{"id":studentId})
+    listings=[dict(row) for row in catalog.mappings()]
+    try:
+        session.commit()
+    except:
+        # probably not happened, only when id is invlaid
+        fail_response("some errors here")
+    return success_response({"listings": listings, "count": len(listings)},"search successfully")
+
+
+
+@app.route("/api/listing/search_key/<keyword>", methods=["GET"])
+# search by keyword
+def search_by_keyword(keyword):
+    if not keyword: return fail_response("lack of keyword")
+
+    catalog = ListingCatalog(query=keyword)
+    session.add(catalog)
+    session.commit()
+    results = catalog.searchByKeyword()
+    return success_response({"listings": results, "count": len(results)})
+
+@app.route("/api/listing/search_cate/<category>", methods=["GET"])
+# search by category
+def search_by_category(category):
+    if not category: return fail_response("lack of category")
+
+    catalog = ListingCatalog(query=category)
+    session.add(catalog)
+    session.commit()
+    results = catalog.searchByCategory()
+    return success_response({"listings": results, "count": len(results)})
+
+
+@app.route("/api/listing/save", methods=["POST"])
+# saved products
+def save_listing():
+    json_data = request.get_json()
+    required = ["studentId", "listingId"]
+    for field in required:
+        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+    student = session.query(Student).get(json_data["studentId"])
+    if not student:
+        return fail_response("student not exist")
+
+    success = student.saveListing(json_data["listingId"])
+    if success: return success_response("sucessfully saved")
+    return fail_response("saved failed")
+
+@app.route("/api/listing/purchase", methods=["POST"])
+# buy product
+def purchase_listing():
+    json_data = request.get_json()
+    required = ["studentId", "listingId"]
+    for field in required:
+        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+    student = session.query(Student).get(json_data["studentId"])
+    if not student:
+        return fail_response("student not exist")
+
+    success = student.purchaseItem(
+        json_data["listingId"],
+        payment_method=json_data.get("paymentMethod")
+    )
+    return success_response("successfully buy it ") if success else fail_response("product doesn't exist/sold out/not your product")
+
+@app.route("/api/student/saved-listings/<student_id>", methods=["GET"])
+def get_saved_listings(student_id):
+    if not student_id:
+        return fail_response("lack of student id")
+
+    student = session.query(Student).get(student_id)
+    if not student:
+        return fail_response("student doesn't exist")
+
+    # get saved listing
+    saved_listings = student.reportListing()
+    return success_response({
+        "savedListings": saved_listings,
+        "count": len(saved_listings)
+    }, "successfully find saving list")
+
+
+
+@app.route("/api/message/send", methods=["POST"])
+def send_message():
+    # send message
+    json_data = request.get_json()
+    required = ["senderId", "receiverId", "content"]
+    for field in required:
+        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+    # reciever do exist since it is chosen from the goods list
+    inbox = session.query(Inbox).filter_by(student_id=json_data["receiverId"]).first()
+    if not inbox:
+        print("")
+        inbox = Inbox(student_id=json_data["receiverId"])
+        session.add(inbox)
+        session.commit()
+
+    msg_id = inbox.sendmessage(json_data["senderId"], json_data["content"])
+    return success_response({"messageId": msg_id}, "message send successfully") if msg_id else fail_response("message send failed")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, host="0.0.0.0")
+    app.run(debug=True, port=5000)
+
