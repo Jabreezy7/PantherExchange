@@ -1,298 +1,467 @@
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, relationship
 import sqlalchemy
-from datetime import *
+from datetime import datetime
 
-#generate class base for data
-Base=sqlalchemy.orm.declarative_base()
+from backend.app import student_login
 
-# comes from student table
-# blockedUsers record blocker and blocked person; savedListing record starred student
-# and corresponding item
-# primary key mark the starred situation only exist once
-blocked_users = Table(
-    'blockedUsers',
-    # manage tables
-    Base.metadata,
-    Column('blocker_id', Integer, ForeignKey('student.id'), primary_key=True),  # 屏蔽者ID（关联Student表）
-    Column('blocked_id', Integer, ForeignKey('student.id'), primary_key=True)   # 被屏蔽者ID（关联Student表）
-)
-saved_listings = Table(
-    'savedListings',
-    # manage tables
-    Base.metadata,
-    Column('student_id', Integer, ForeignKey('student.id'), primary_key=True),  # 用户ID（关联Student表）
-    Column('listing_id', Integer, ForeignKey('listing.id'), primary_key=True)   # 列表ID（关联Listing表）
-)
+# global session
+Base = sqlalchemy.orm.declarative_base()
+engine = create_engine("sqlite:///order.db")
+Session = sessionmaker(bind=engine)
+session = Session()
 
-# message
-inbox_messages = Table(
-    'inbox_messages',  # 中间表名
-    Base.metadata,
-    Column('inbox_id', Integer, ForeignKey('inbox.id'), primary_key=True),  # 关联收件箱ID
-    Column('message_id', Integer, ForeignKey('message.id'), primary_key=True)  # 关联消息ID
-)
+# ---------depend class/tables-------
 
-# catalog
-catalog_listings = Table(
-    'catalog_listings',
-    Base.metadata,
-    Column('catalog_id', Integer, ForeignKey('listing_catalog.id'), primary_key=True),
-    Column('listing_id', Integer, ForeignKey('listing.id'), primary_key=True)
-)
-
-class Listing(Base):
-    __tablename__ ="listing"
-    # required data
+# tags of goods
+class Tag(Base):
+    __tablename__ = "tag"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(String(100), nullable=False)
-    # descriptions about
-    description = Column(Text, nullable=False)
-    # should be digit
+    name = Column(String(50), unique=True, nullable=False) 
+
+# table between goods and tags
+class ListingTag(Base):
+
+    # on delete makes sure it automatically delete(even though i did it in deletelisitng method)
+    __tablename__ = "listing_tag"
+    listing_id = Column(
+        Integer,
+        ForeignKey("listing.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+    tag_id = Column(
+        Integer,
+        ForeignKey("tag.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
+# orders,store transaction history
+class Order(Base):
+
+    __tablename__ = "order"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    buyer_id = Column(
+        Integer,
+        ForeignKey("student.id"),
+        nullable=False
+    )
+    listing_id = Column(
+        Integer,
+        ForeignKey("listing.id"),
+        nullable=False
+    )
+    seller_id = Column(
+        Integer,
+        ForeignKey("student.id"),
+        nullable=False
+    )
+    # price, payment and order time
     price = Column(Float, nullable=False)
-    sellerName = Column(String(50), nullable=False)
-    address = Column(String(100))
-    datePosted = Column(DateTime, default=datetime.now())
+    payment_method = Column(String(256))
+    order_time = Column(DateTime, default=datetime.now, nullable=False)
 
-    # not required
-    # there can have mutiple images
-    images = Column(JSON, default=[])
-    category = Column(String(50), nullable=True)
-    status = Column(String(20), default="active")
+# blocked user(not sure whether to implement it)
+class BlockedUser(Base):
+    __tablename__ = "blockedUsers"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # auto clean blocked users when it is removed
+    student_id = Column(
+        Integer,
+        ForeignKey("student.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    blocked_id = Column(
+        Integer,
+        ForeignKey("student.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    block_time = Column(DateTime, default=datetime.now, nullable=False)  
+    # we can't block same user multiple times when it is blocked
+    __table_args__ = (UniqueConstraint('student_id', 'blocked_id', name='_student_blocked_uc'),)
 
-    # store buyer and seller information
-    seller_id = Column(Integer, ForeignKey("sellers.id"), nullable=False)
-    buyer_id = Column(Integer, ForeignKey("student.id"), nullable=True)
 
 class Student(Base):
-    __tablename__ ="student"
-    id=Column(Integer, primary_key=True, autoincrement=True)
-
-    # required data
-    name=Column(String(50),nullable=False)
+    __tablename__ = "student"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), nullable=False)
     pittEmail = Column(String(100), unique=True, nullable=False)
     phoneNumber = Column(String(20), nullable=False)
     password = Column(String(256), nullable=False)
-
-
-    # secondary shows which table is used
-    # primaryjoin shows who is blocker; secondaryjoin shows who is blocked
-    #   1. .c means visit the collection of column
-    blockedUsers=relationship(
-        'Student',
-        secondary=blocked_users,
-        primaryjoin=(blocked_users.c.blocker_id == id),
-        secondaryjoin=(blocked_users.c.blocker_id == id)
-    )
-    savedListings=relationship(
-        'Listing',
-        secondary=saved_listings,
-        primaryjoin=(saved_listings.c.student_id == id),
-        secondaryjoin=(saved_listings.c.listing_id == Listing.id),
-    )
-
-    # build one to one relationship
-    buyer = relationship("Buyer", backref="student", uselist=False)
-    seller = relationship("Seller", backref="student", uselist=False)
-    inbox = relationship("Inbox", backref="student", uselist=False)
-
-#     not required
     paymentMethod = Column(String(256), nullable=True)
-    paymentInformation = Column(String(256), nullable=True)
+    paymentInformation = Column(Text, nullable=True)
 
-    def login(self,input_password):
-        return self.password==input_password
+    # 1. checked blocked users
+    @property
+    def blockedUsers(self):
+        sql = text("""
+            SELECT bu.blocked_id, s.name as blocked_name, bu.block_time
+            FROM blockedUsers bu
+            JOIN student s ON bu.blocked_id = s.id
+            WHERE bu.student_id = :stu_id
+        """)
+        res = session.execute(sql, {"stu_id": self.id})
+        return [dict(row) for row in res.mappings()]
 
-    def register(self, session):
-        # create buyer, seller and inbox
-        if not self.buyer:
-            self.buyer = Buyer(id=self.id)  # 关联当前学生的id
-        if not self.seller:
-            self.seller = Seller(id=self.id)  # 关联当前学生的id
-        if not self.inbox:
-            self.inbox = Inbox(student_id=self.id)  # 关联当前学生的id
+    # 2. check saved products
+    @property
+    def savedListing(self):
+        # sql=text("select distinct l.* from listing l join savedList sl on l.id = sl.product_id"
+        #          " where sl.student_id =:id and l.status='Available' and l.id is not null")
+        sql=text("select * from savedList where student_id= :id")
+        res = session.execute(sql, {"id": self.id})
+        return [dict(row) for row in res.mappings()]
 
-        # store to dataset
-        session.add_all([self.buyer, self.seller, self.inbox])
-        session.commit()
+    # login testing, make sure name and password are the same
+    def login(self, name, password):
+        res= (name==self.name) and (password== self.password)
+        print("Res is:",res)
+        # create inbox
+        if res:
+            exist=session.query(Inbox).filter_by(student_id=self.id).first()
+            if not exist:
+                new_inbox=Inbox(student_id=self.id)
+                session.add(new_inbox)
+                session.commit()
+        return  res
 
-    def reportListing(self,session):
-        # check all message order by time
-        received_messages = session.query(Message). \
-            join(inbox_messages, Message.id == inbox_messages.c.message_id). \
-            filter(inbox_messages.c.inbox_id == self.inbox.id). \
-            order_by(Message.timeStamp). \
-            all()
+    # return all of the saved list
+    def reportListing(self):
+        return self.savedListing
 
-        # 3. formatting message
-        message_list = []
-        for msg in received_messages:
-            # get sender information
-            sender = session.query(Student).get(msg.sender_id)
-            sender_name = sender.name if sender else " "
+    # check student's selling products
+    @property
+    def sellerlisting(self):
+        sql = text("SELECT * FROM listing WHERE seller = :id")
+        res = session.execute(sql, {"id": self.id})
+        return [dict(row) for row in res.mappings()]
 
-            message_list.append({
-                "sender": sender_name,
-                "email": sender.pittEmail,
-                "phone": sender.phoneNumber,
-                "content": msg.content,
-                "timestamp": msg.timeStamp.strftime("%Y-%m-%d %H:%M:%S")
+    # 6. create product
+    def createListing(self, title, description, price, address, category="Books", status="Available"):
+        try:
+            # insert products' record
+            sql = text("""
+                INSERT INTO listing 
+                (title, description, price, sellerName, seller, address, category, status, datePosted)
+                VALUES (:title, :desc, :price, :seller_name, :seller_id, :addr, :cate, :status, CURRENT_TIMESTAMP)
+                RETURNING id 
+            """)
+            res = session.execute(sql, {
+                # product tile, description, price, category, address and status
+                # (seller name and seller_id automatically created)
+                "title": title,
+                "desc": description,
+                "price": price,
+                "seller_name": self.name,
+                "seller_id": self.id,
+                "addr": address,
+                "cate": category,
+                "status": status
             })
-
-        # 4. 返回整理后的消息列表
-        return message_list
-
-# extends from student
-class Buyer(Base):
-    __tablename__ = "buyers"
-
-    id = Column(Integer, ForeignKey("student.id"), primary_key=True)
-
-    def purchaseItem(self,listing,session):
-        # check active
-        if listing.status != "active":
-            return False
-
-        # not allowed to buy itself's item
-        if listing.seller_id == self.id:
-            return False
-
-        # buy it(sold)
-        listing.status = "sold"
-        listing.buyer_id = self.id
-
-        message_content=f"{self.student.name} bought your product {listing.title}"
-        new_message=Message(sender_id=self.id,receiver_id=listing.seller_id,content=message_content)
-        session.add(new_message)
-
-        # add message to seller inbox
-        seller = session.query(Student).get(listing.seller_id)
-        if seller and seller.inbox:
-            seller.inbox.messages.append(new_message)
-
-        session.commit()
-        return True
-
-    def saveListing(self,listing,session):
-        if listing in self.student.savedListings:
-            # not save
-            self.student.savedListings.remove(listing)
-        else:
-            # save
-            self.student.savedListings.append(listing)
-        session.commit()
-
-class Seller(Base):
-    __tablename__ = "sellers"
-
-    id = Column(Integer, ForeignKey("student.id"), primary_key=True)
-
-    def createListing(self, **kwargs):
-        required_fields = ["title", "description", "price", "seller_name"]
-        for field in required_fields:
-            if field not in kwargs or not kwargs[field]:
-                return None
-
-        # 2. check price
-        try:
-            price = float(kwargs["price"])
-            if price <= 0:
-                return None
-        except ValueError:
-            return None
-
-        # create goods
-        try:
-            new_listing = Listing(
-                title=kwargs["title"],
-                description=kwargs["description"],
-                price=price,
-                sellerName=kwargs["seller_name"],
-                # can be null
-                address=kwargs.get("address", ""),
-                # auto set time
-                datePosted=datetime.now(),
-                images=kwargs.get("images", []),
-                category=kwargs.get("category", ""),
-                # initliaze as active
-                status="active",
-                seller_id=self.id
-            )
-
-            # store to dataset
-            session.add(new_listing)
+            listing_id = res.scalar()
             session.commit()
-            return new_listing
-
+            print(f"successfully created product：{listing_id}")
+            return listing_id
         except Exception as e:
             session.rollback()
-            return None, f"pulish failed：{str(e)}"
+            print("failed to create product")
+            return None
 
-    def deleteListing(self,listing_id,session):
-        listing = session.query(Listing).get(listing_id)
-        if not listing:
+    # delete product
+    def deleteListing(self, listing_id):
+        try:
+            # make sure product exist
+            listing = session.execute(
+                text("SELECT 1 FROM listing WHERE id = :list_id AND seller = :seller_id"),
+                {"list_id": listing_id, "seller_id": self.id}
+            ).scalar()
+            if not listing:
+                print("goods doesn't exist or not belongs to you")
+                return False
+
+            # 2. delete product from listing_tag, listing, savedlist
+            session.execute(
+                text("DELETE FROM listing WHERE id = :list_id"),
+                {"list_id": listing_id}
+            )
+            session.execute(
+                text("DELETE FROM savedList WHERE product_id = :list_id"),
+                {"list_id": listing_id}
+            )
+
+            session.execute(
+                text("DELETE FROM listing_tag WHERE listing_id = :list_id"),
+                {"list_id": listing_id}
+            )
+            session.commit()
+            print("successfully delete product")
+            return True
+        except Exception as e:
+            session.rollback()
+            print("failed to delete product")
             return False
 
-        # only delete personal item
-        if listing.seller_id != self.id:
+    # give product a tag
+    def tagListing(self, listing_id, tags):
+        try:
+            # make sure product belongs to student
+            listing_exists = session.execute(
+                text("SELECT 1 FROM listing WHERE id = :list_id AND seller = :seller_id"),
+                {"list_id": listing_id, "seller_id": self.id}
+            ).scalar()
+            if not listing_exists:
+                print("goods doesn't exist or not belongs to you")
+                return False
+
+            # delete all the current related tags
+            session.execute(
+                text("DELETE FROM listing_tag WHERE listing_id = :list_id"),
+                {"list_id": listing_id}
+            )
+            session.flush()
+
+        # deal wirh tag
+            for tag_name in tags:
+                # check whether tag exist
+                tag = session.query(Tag).filter_by(name=tag_name).first()
+                if not tag:
+                    # add tags
+                    tag = Tag(name=tag_name)
+                    session.add(tag)
+                    # get tag
+                    session.flush()
+
+                # check whether tag exist
+                listing_tag = session.query(ListingTag).filter_by(
+                    listing_id=listing_id, tag_id=tag.id
+                ).first()
+                if not listing_tag:
+                    # add correlations
+                    listing_tag = ListingTag(listing_id=listing_id, tag_id=tag.id)
+                    session.add(listing_tag)
+
+            session.commit()
+            print("succesfully tag it")
+            return True
+        except Exception as e:
+            session.rollback()
+            print("failed to tag it")
             return False
 
-        # delete it
-        session.delete(listing)
-        session.commit()
-        return True
+    # buy product
+    def purchaseItem(self, listing_id, payment_method=None):
+        try:
+            # make sure we can buy the product
+            listing = session.execute(
+                text("SELECT * FROM listing WHERE id = :list_id AND status = 'Available'"),
+                {"list_id": listing_id}
+            ).mappings().first()
+            if not listing:
+                print("product doesn't exist or sold out ")
+                return False
 
+            # make sure buyer not seller
+            if listing["seller"] == self.id:
+                print("you can't buy your own product")
+                return False
 
-    def tagListing(self):
-        pass
+            # create order
+            order = Order(
+                buyer_id=self.id,
+                listing_id=listing_id,
+                seller_id=listing["seller"],
+                price=listing["price"],
+                payment_method=payment_method or self.paymentMethod
+            #     auto generate order time
+            )
+            session.add(order)
 
+            # update product as sold out
+            session.execute(
+                text("UPDATE listing SET status = 'Sold' WHERE id = :list_id"),
+                {"list_id": listing_id}
+            )
 
-class Message(Base):
-    __tablename__ = "message"
+            # delete that product
+            session.execute(
+                text("DELETE FROM savedList WHERE product_id = :list_id"),
+                {"list_id": listing_id}
+            )
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    sender_id= Column(Integer, ForeignKey("student.id"), nullable=False)
-    receiver_id= Column(Integer, ForeignKey("student.id"), nullable=False)
-    content = Column(Text, nullable=False)
-    # default current time
-    timeStamp = Column(DateTime, default=datetime.now)
+            session.commit()
+            print("successfully buy it")
+            return True
+        except Exception as e:
+            session.rollback()
+            print("failed to buy it ")
+            return False
+
+    # save product
+    def saveListing(self, product_id):
+        try:
+            # verify product exist
+            product_exists = session.execute(
+                text("SELECT 1 FROM listing WHERE id = :prod_id and seller != :student_id"),
+                {"prod_id": product_id,"student_id": self.id}
+            ).scalar()
+            if not product_exists:
+                print("product doesn't exist")
+                return False
+
+            # verify not save repeatedly
+            exists = session.execute(
+                text("SELECT 1 FROM savedList WHERE student_id = :stu_id AND product_id = :prod_id"),
+                {"stu_id": self.id, "prod_id": product_id}
+            ).scalar()
+            if exists:
+                print("you've already saved it")
+                return False
+
+            # 3. insert into saved list
+            session.execute(
+                text("INSERT INTO savedList (student_id, product_id) VALUES (:stu_id, :prod_id)"),
+                {"stu_id": self.id, "prod_id": product_id}
+            )
+            session.commit()
+            print("successfully saved it")
+            return True
+        except Exception as e:
+            session.rollback()
+            print("failed to save it")
+            return False
 
 class Inbox(Base):
     __tablename__ = "inbox"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    # store student's id
-    student_id = Column(Integer, ForeignKey("student.id"), unique=True, nullable=False)
+    student_id = Column(Integer, ForeignKey("student.id", ondelete="CASCADE"), nullable=False)  # 关联学生ID（每个学生一个收件箱）
 
-    messages = relationship(
-        'Message',
-        secondary=inbox_messages,  # 显式指定中间表
-        primaryjoin=(inbox_messages.c.inbox_id == id),
-        secondaryjoin=(inbox_messages.c.message_id == Message.id),
-    )
+    # get all messages
+    @property
+    def message(self):
+        # return all the buyer's message(based on time)
+        sql = text("""
+            SELECT m.*, s.name as sender_name 
+            FROM message m
+            JOIN student s ON m.sender_id = s.id
+            WHERE m.receiver_id = :stu_id
+            ORDER BY m.timeStamp DESC
+        """)
+        res = session.execute(sql, {"stu_id": self.student_id})
+        return [dict(row) for row in res.mappings()]
+
+    # send message when buy products
+    def sendmessage(self, sender_id, content):
+        try:
+            # verify buyer and seller
+            sender_exists = session.execute(
+                text("SELECT 1 FROM student WHERE id = :sender_id"),
+                {"sender_id": sender_id}
+            ).scalar()
+            receiver_exists = session.execute(
+                text("SELECT 1 FROM student WHERE id = :receiver_id"),
+                {"receiver_id": self.student_id}
+            ).scalar()
+
+            if not sender_exists:
+                print("sender doesn't exist")
+                return None
+            if not receiver_exists:
+                print("reciever doesn't exist")
+                return None
+
+            # insert messages
+            sql = text("""
+                INSERT INTO message (sender_id, receiver_id, content, timeStamp)
+                VALUES (:sender_id, :receiver_id, :content, :current_time)
+                RETURNING id
+            """)
+            res = session.execute(sql, {
+                "sender_id": sender_id,
+                "receiver_id": self.student_id,
+                "content": content,
+                "current_time": datetime.now()
+            })
+            msg_id = res.scalar()
+            session.commit()
+            print("successfully send message")
+            return msg_id
+        except Exception as e:
+            session.rollback()
+            print("failed send messages")
+            return None
+
+class Message(Base):
+    __tablename__ = "message"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sender_id = Column(Integer, ForeignKey("student.id", ondelete="CASCADE"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("student.id", ondelete="CASCADE"), nullable=False)
+    content = Column(Text, nullable=False)
+    timeStamp = Column(DateTime, default=datetime.now)
+
+class Listing(Base):
+    __tablename__ = "listing"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(100), nullable=False)
+    description = Column(Text, nullable=False)
+    price = Column(Float, nullable=False)
+    sellerName = Column(String(50), nullable=False)
+    address = Column(String(100))
+    datePosted = Column(DateTime, default=datetime.now)
+    images = Column(JSON, default=[])
+    category = Column(String(50), nullable=True)
+    status = Column(String(20),default="Available")
+    seller = Column(Integer, ForeignKey("student.id"))
 
 class ListingCatalog(Base):
-    __tablename__ = "listing_catalog"
+    __tablename__ = "listingCatalog"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    listings = relationship(
-        'Listing',
-        secondary=catalog_listings,  # 中间表
-        primaryjoin=(catalog_listings.c.catalog_id == id),
-        secondaryjoin=(catalog_listings.c.listing_id == Listing.id),
-    )
-    query=Column(String(100), nullable=False)
+    query = Column(String(100), nullable=False)
 
+    # search all products
+    @property
+    def listings(self):
+        sql = text("SELECT * FROM listing")
+        res = session.execute(sql)
+        return [dict(row) for row in res.mappings()]
+
+    # search by keyword
     def searchByKeyword(self):
-        pass
+        sql = text("""
+            SELECT * FROM listing 
+            WHERE title LIKE :kw OR description LIKE :kw
+            ORDER BY datePosted DESC
+        """)
+
+        res = session.execute(sql, {"kw": f"%{self.query}%"})  # use like to do vague search
+        return [dict(row) for row in res.mappings()]
+
+    # search by category
     def searchByCategory(self):
-        pass
-    def sortBy(self):
-        pass
+        sql = text("""
+            SELECT * FROM listing 
+            WHERE category = :category
+            ORDER BY datePosted DESC
+        """)
+        res = session.execute(sql, {"category": self.query})
+        return [dict(row) for row in res.mappings()]
 
-#using sql database
-engine = create_engine("sqlite:///order.db")
-#generate database
+    # sort by price
+    def sortBy(self, sort_type="asc"):
+        # default ascending
+        if sort_type not in ["asc", "desc"]:
+            sort_type = "asc"
+
+        sql = text(f"SELECT * FROM listing ORDER BY price {sort_type}")
+        res = session.execute(sql)
+        return [dict(row) for row in res.mappings()]
+
+class SavedList(Base):
+    __tablename__ = "savedList"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("student.id", ondelete="CASCADE"))
+    product_id = Column(Integer, ForeignKey("listing.id", ondelete="CASCADE"))
+    # avoid save repeatedlly(maybe implemented previously)
+    __table_args__ = (UniqueConstraint('student_id', 'product_id', name='_student_product_uc'),)
+
+# ---------create all tables-----------------
 Base.metadata.create_all(engine)
-
-#build dataset factory and finally instantialized an object
-Session = sessionmaker(bind=engine)
-session = Session()
+print("all tables have been generated")
