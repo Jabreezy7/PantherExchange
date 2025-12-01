@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 import sqlalchemy
 from datetime import datetime
 
-from backend.app import student_login
+from app import student_login
 
 # global session
 Base = sqlalchemy.orm.declarative_base()
