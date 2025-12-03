@@ -16,6 +16,16 @@ function SellPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    let imageData = null;
+
+      if (image) {
+        imageData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(image);
+        });
+      }
+
     try {
       const formData = {
         title,
@@ -23,7 +33,7 @@ function SellPage() {
         price: Number(price),
         address,
         category,
-        image: image ? image.name : null,
+        image: imageData,
       };
 
       await addListingAPI(formData);
