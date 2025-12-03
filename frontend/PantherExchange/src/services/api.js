@@ -6,11 +6,11 @@ const API = axios.create({
 
 export const getListings = (category) => {
   const params = category && category !== "All" ? { category } : {};
-  return API.get("/api/listings", { params });
+  return API.get("/api/listing", { params });
 };
 
 export const addListing = (data) => {
-  return API.post("/api/listings", data, {
+  return API.post("/api/listing", data, {
     headers: { "Content-Type": "application/json" },
   });
 };

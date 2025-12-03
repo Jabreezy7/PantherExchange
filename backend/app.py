@@ -6,11 +6,14 @@ app = Flask(__name__)
 # work on different URL
 CORS(app)  
 
+listings = []
+listing_id_counter = 1
+
 # commonly used response jsonfy result
 
 # default as non-data and operation succesfully, with 200 as operate sucessful
 def success_response(data=None, msg="operate successfully"):
-    return jsonify({"success": True, "data": data or {}, "msg": msg}), 200
+    return jsonify({"success": True, "data": data or [], "msg": msg}), 200
 
 # failed due to server errors, but it depends on several situations
 def fail_response(msg="operate failed", code=400):
@@ -77,41 +80,69 @@ def student_login():
         "pittEmail": student.pittEmail
     }, "login successful")
 
+# @app.route("/api/listing", methods=["POST"])
+# # create goods
+# def create_listing():
+#     json_data = request.get_json()
+#     required = ["studentId", "title", "description", "price", "address"]
+
+#     # missing any type of data, return missing required field
+#     for field in required:
+#         if field not in json_data or json_data[field]==None: return fail_response("missing required field")
+
+#     student = session.query(Student).get(json_data["studentId"])
+#     if not student:
+#         return fail_response("student not exist")
+
+#     # make sure title and price in valid range
+#     title=json_data["title"]
+#     if len(str(title))>100: return fail_response("too long title, please make it shorter")
+#     price=json_data["price"]
+#     if int(price)<0: return fail_response("price should be a positive number")
+
+#     # it includes all the required information, if not exist, within default values
+#     try:
+#         listing_id = student.createListing(
+#             title=title,
+#             description=json_data["description"],
+#             price=json_data["price"],
+#             address=json_data["address"],
+#             category=json_data.get("category", "Books"),
+#             status=json_data.get("status", "Available")
+#         )
+#         # succesfully created
+#         return success_response({"listingId": listing_id}, "goods create suceesfully")
+#     except:
+#         # other failure
+#         return fail_response("Other exceptions, please check the address/category/status field")
+
 @app.route("/api/listing", methods=["POST"])
-# create goods
 def create_listing():
-    json_data = request.get_json()
-    required = ["studentId", "title", "description", "price", "address"]
-
-    # missing any type of data, return missing required field
-    for field in required:
-        if field not in json_data or json_data[field]==None: return fail_response("missing required field")
-
-    student = session.query(Student).get(json_data["studentId"])
-    if not student:
-        return fail_response("student not exist")
-
-    # make sure title and price in valid range
-    title=json_data["title"]
-    if len(str(title))>100: return fail_response("too long title, please make it shorter")
-    price=json_data["price"]
-    if int(price)<0: return fail_response("price should be a positive number")
-
-    # it includes all the required information, if not exist, within default values
+    global listing_id_counter
+    
     try:
-        listing_id = student.createListing(
-            title=title,
-            description=json_data["description"],
-            price=json_data["price"],
-            address=json_data["address"],
-            category=json_data.get("category", "Books"),
-            status=json_data.get("status", "Available")
-        )
-        # succesfully created
-        return success_response({"listingId": listing_id}, "goods create suceesfully")
+        json_data = request.get_json()
+        
+        price = float(json_data["price"])
+        
+        new_listing = {
+            "id": listing_id_counter,
+            "title": json_data["title"],
+            "description": json_data["description"],
+            "price": f"${price}",
+            "address": json_data["address"],
+            "category": json_data["category"],
+            "image": json_data.get("image")
+        }
+        
+        listings.append(new_listing)
+        listing_id_counter += 1
+        
+        return success_response({"listingId": new_listing["id"]}, "Finally")
+    
     except:
-        # other failure
-        return fail_response("Other exceptions, please check the address/category/status field")
+        return fail_response("Something aint right")
+    
 
 @app.route("/api/listing/batch", methods=["POST"])
 # created in batch(may not implemented)
@@ -192,13 +223,31 @@ def tag_listing():
         return fail_response("failed to create tag")
 
 
+# @app.route("/api/listing", methods=["GET"])
+# # check for all data while no login
+# def get_listings():
+#     # select all of the data, no matter login or not
+#     catalog = ListingCatalog(query="all")
+#     listings = catalog.listings
+#     return success_response({"listings": listings, "count": len(listings)},"search successfully")
+
 @app.route("/api/listing", methods=["GET"])
-# check for all data while no login
 def get_listings():
-    # select all of the data, no matter login or not
-    catalog = ListingCatalog(query="all")
-    listings = catalog.listings
-    return success_response({"listings": listings, "count": len(listings)},"search successfully")
+    try:
+        category = request.args.get("category")
+        
+        if category and category != "All":
+            filtered_listings = []
+            for listing in listings:
+                if listing["category"] == category:
+                    filtered_listings.append(listing)
+
+            return success_response(filtered_listings, "Got the listings")
+        
+        return success_response(listings, "Listings retrieved successfully")
+        
+    except:
+        return fail_response("Something aint right")
 
 @app.route("/api/listing/<int:studentId>", methods=["GET"])
 # check for all data while login

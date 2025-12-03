@@ -16,7 +16,9 @@ function SellPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    let imageData = null;
+    try {
+
+      let imageData = null;
 
       if (image) {
         imageData = await new Promise((resolve, reject) => {
@@ -26,7 +28,6 @@ function SellPage() {
         });
       }
 
-    try {
       const formData = {
         title,
         description,
