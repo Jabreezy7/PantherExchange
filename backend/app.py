@@ -19,9 +19,10 @@ def success_response(data=None, msg="operate successfully"):
 def fail_response(msg="operate failed", code=400):
     return jsonify({"success": False, "msg": msg}), code
 
-
-
-
+# Health Check
+@app.route("/health", methods=["GET"])
+def health():
+    return {"status": "ok"}, 200
 
 @app.route("/api/student/register", methods=["POST"])
 # studnet register
