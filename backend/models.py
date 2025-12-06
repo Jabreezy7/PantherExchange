@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 from flask_sqlalchemy import SQLAlchemy
 import sqlalchemy
 
-from backend.app import student_login
+from app import student_login
 
 # global session
 db=SQLAlchemy()
