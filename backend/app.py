@@ -1,12 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from models import *
-from sqlalchemy import text
-from datetime import datetime
 
 app = Flask(__name__)
 # work on different URL
-CORS(app)
+CORS(app)  
 
 listings = []
 listing_id_counter = 1
@@ -22,285 +20,7 @@ def fail_response(msg="operate failed", code=400):
     return jsonify({"success": False, "msg": msg}), code
 
 
-# -------------------------
-# Implementations of methods that used to live in models.py
-# These implementations use the session and model classes imported from models.py
-# and are attached to the classes so existing route code can keep calling them.
-# -------------------------
 
-# Student.login
-def _student_login(self, password):
-    try:
-        res = password == self.password
-        print("Res is:", res)
-        if res:
-            exist = session.query(Inbox).filter_by(student_id=self.id).first()
-            if not exist:
-                new_inbox = Inbox(student_id=self.id)
-                session.add(new_inbox)
-                session.commit()
-        return res
-    except Exception as e:
-        session.rollback()
-        print("error in login:", e)
-        return False
-
-Student.login = _student_login
-
-
-# Student.reportListing -> return saved listings (rows from savedList)
-def _student_reportListing(self):
-    try:
-        sql = text("SELECT * FROM savedList WHERE student_id = :id")
-        res = session.execute(sql, {"id": self.id})
-        return [dict(row) for row in res.mappings()]
-    except Exception as e:
-        print("reportListing error:", e)
-        return []
-
-Student.reportListing = _student_reportListing
-
-
-# Student.deleteListing
-def _student_deleteListing(self, listing_id):
-    try:
-        # make sure product exist and belongs to student
-        listing = session.execute(
-            text("SELECT 1 FROM listing WHERE id = :list_id AND seller = :seller_id"),
-            {"list_id": listing_id, "seller_id": self.id}
-        ).scalar()
-        if not listing:
-            print("goods doesn't exist or not belongs to you")
-            return False
-
-        # delete listing, savedList and listing_tag entries
-        session.execute(
-            text("DELETE FROM listing WHERE id = :list_id"),
-            {"list_id": listing_id}
-        )
-        session.execute(
-            text("DELETE FROM savedList WHERE product_id = :list_id"),
-            {"list_id": listing_id}
-        )
-        session.execute(
-            text("DELETE FROM listing_tag WHERE listing_id = :list_id"),
-            {"list_id": listing_id}
-        )
-        session.commit()
-        print("successfully delete product")
-        return True
-    except Exception as e:
-        session.rollback()
-        print("failed to delete product:", e)
-        return False
-
-Student.deleteListing = _student_deleteListing
-
-
-# Student.tagListing
-def _student_tagListing(self, listing_id, tags):
-    try:
-        # make sure product belongs to student
-        listing_exists = session.execute(
-            text("SELECT 1 FROM listing WHERE id = :list_id AND seller = :seller_id"),
-            {"list_id": listing_id, "seller_id": self.id}
-        ).scalar()
-        if not listing_exists:
-            print("goods doesn't exist or not belongs to you")
-            return False
-
-        # delete current relations
-        session.execute(
-            text("DELETE FROM listing_tag WHERE listing_id = :list_id"),
-            {"list_id": listing_id}
-        )
-        session.flush()
-
-        for tag_name in tags:
-            # check whether tag exist
-            tag = session.query(Tag).filter_by(name=tag_name).first()
-            if not tag:
-                tag = Tag(name=tag_name)
-                session.add(tag)
-                session.flush()  # ensure tag.id is populated
-
-            # check whether relation exists
-            listing_tag = session.query(ListingTag).filter_by(
-                listing_id=listing_id, tag_id=tag.id
-            ).first()
-            if not listing_tag:
-                listing_tag = ListingTag(listing_id=listing_id, tag_id=tag.id)
-                session.add(listing_tag)
-
-        session.commit()
-        print("succesfully tag it")
-        return True
-    except Exception as e:
-        session.rollback()
-        print("failed to tag it:", e)
-        return False
-
-Student.tagListing = _student_tagListing
-
-
-# Student.saveListing
-def _student_saveListing(self, product_id):
-    try:
-        # verify product exist and not owned by student
-        product_exists = session.execute(
-            text("SELECT 1 FROM listing WHERE id = :prod_id and seller != :student_id"),
-            {"prod_id": product_id, "student_id": self.id}
-        ).scalar()
-        if not product_exists:
-            print("product doesn't exist")
-            return False
-
-        # verify not saved repeatedly
-        exists = session.execute(
-            text("SELECT 1 FROM savedList WHERE student_id = :stu_id AND product_id = :prod_id"),
-            {"stu_id": self.id, "prod_id": product_id}
-        ).scalar()
-        if exists:
-            print("you've already saved it")
-            return False
-
-        # insert into saved list
-        session.execute(
-            text("INSERT INTO savedList (student_id, product_id) VALUES (:stu_id, :prod_id)"),
-            {"stu_id": self.id, "prod_id": product_id}
-        )
-        session.commit()
-        print("successfully saved it")
-        return True
-    except Exception as e:
-        session.rollback()
-        print("failed to save it:", e)
-        return False
-
-Student.saveListing = _student_saveListing
-
-
-# Student.purchaseItem
-def _student_purchaseItem(self, listing_id, payment_method=None):
-    try:
-        # make sure listing exists and is Available
-        listing = session.execute(
-            text("SELECT * FROM listing WHERE id = :list_id AND status = 'Available'"),
-            {"list_id": listing_id}
-        ).mappings().first()
-        if not listing:
-            print("product doesn't exist or sold out ")
-            return False
-
-        # make sure buyer not seller
-        if listing["seller"] == self.id:
-            print("you can't buy your own product")
-            return False
-
-        # create order (ORM)
-        order = Order(
-            buyer_id=self.id,
-            listing_id=listing_id,
-            seller_id=listing["seller"],
-            price=listing["price"],
-            payment_method=payment_method or self.paymentMethod
-        )
-        session.add(order)
-
-        # update product as sold out
-        session.execute(
-            text("UPDATE listing SET status = 'Sold' WHERE id = :list_id"),
-            {"list_id": listing_id}
-        )
-
-        # delete from savedList
-        session.execute(
-            text("DELETE FROM savedList WHERE product_id = :list_id"),
-            {"list_id": listing_id}
-        )
-
-        session.commit()
-        print("successfully buy it")
-        return True
-    except Exception as e:
-        session.rollback()
-        print("failed to buy it :", e)
-        return False
-
-Student.purchaseItem = _student_purchaseItem
-
-
-# Inbox.sendmessage
-def _inbox_sendmessage(self, sender_id, content):
-    try:
-        # verify sender and receiver exists
-        sender_exists = session.execute(
-            text("SELECT 1 FROM student WHERE id = :sender_id"),
-            {"sender_id": sender_id}
-        ).scalar()
-        receiver_exists = session.execute(
-            text("SELECT 1 FROM student WHERE id = :receiver_id"),
-            {"receiver_id": self.student_id}
-        ).scalar()
-
-        if not sender_exists:
-            print("sender doesn't exist")
-            return None
-        if not receiver_exists:
-            print("reciever doesn't exist")
-            return None
-
-        # create message via ORM to get id in sqlite safely
-        msg = Message(sender_id=sender_id, receiver_id=self.student_id, content=content, timeStamp=datetime.now())
-        session.add(msg)
-        session.commit()
-        print("successfully send message")
-        return msg.id
-    except Exception as e:
-        session.rollback()
-        print("failed send messages:", e)
-        return None
-
-Inbox.sendmessage = _inbox_sendmessage
-
-
-# ListingCatalog.searchByKeyword
-def _listingcatalog_searchByKeyword(self):
-    sql = text("""
-        SELECT * FROM listing 
-        WHERE title LIKE :kw OR description LIKE :kw
-        ORDER BY datePosted DESC
-    """)
-    try:
-        res = session.execute(sql, {"kw": f"%{self.query}%"})
-        return [dict(row) for row in res.mappings()]
-    except Exception as e:
-        print("searchByKeyword error:", e)
-        return []
-
-ListingCatalog.searchByKeyword = _listingcatalog_searchByKeyword
-
-
-# ListingCatalog.searchByCategory
-def _listingcatalog_searchByCategory(self):
-    sql = text("""
-        SELECT * FROM listing 
-        WHERE category = :category
-        ORDER BY datePosted DESC
-    """)
-    try:
-        res = session.execute(sql, {"category": self.query})
-        return [dict(row) for row in res.mappings()]
-    except Exception as e:
-        print("searchByCategory error:", e)
-        return []
-
-ListingCatalog.searchByCategory = _listingcatalog_searchByCategory
-
-
-# -------------------------
-# End of method implementations
-# -------------------------
 
 
 @app.route("/api/student/register", methods=["POST"])
@@ -311,7 +31,7 @@ def student_register():
     json_data = request.get_json()
 
     # required text filed
-    required = [ "pittEmail", "phoneNumber", "password"]
+    required = ["name", "pittEmail", "phoneNumber", "password"]
 
     # missing any type of data, return missing required field
     for field in required:
@@ -335,7 +55,7 @@ def student_register():
         print(e)
         session.rollback()
         # email has already being used
-        return fail_response("login failed, email has already exist", 400)
+        return fail_response("login failed, email has already exist", 409)
 
 @app.route("/api/student/login", methods=["POST"])
 # student login
@@ -348,10 +68,11 @@ def student_login():
 
     # sql search, students with unqiue pittEmail, so they are existing or not
     student = session.query(Student).filter_by(pittEmail=json_data["pittEmail"]).one_or_none()
+    print(student.name)
 
     # get student email and the following password
-    if not student or not student.login(json_data["password"]):
-        return fail_response("incorrect email or password ")
+    if not student or not student.login(json_data["name"],json_data["password"]):
+        return fail_response("incorrect email or name or password ")
 
     return success_response({
         "studentId": student.id,
@@ -364,21 +85,21 @@ def student_login():
 # def create_listing():
 #     json_data = request.get_json()
 #     required = ["studentId", "title", "description", "price", "address"]
-#
+
 #     # missing any type of data, return missing required field
 #     for field in required:
 #         if field not in json_data or json_data[field]==None: return fail_response("missing required field")
-#
+
 #     student = session.query(Student).get(json_data["studentId"])
 #     if not student:
 #         return fail_response("student not exist")
-#
+
 #     # make sure title and price in valid range
 #     title=json_data["title"]
 #     if len(str(title))>100: return fail_response("too long title, please make it shorter")
 #     price=json_data["price"]
 #     if int(price)<0: return fail_response("price should be a positive number")
-#
+
 #     # it includes all the required information, if not exist, within default values
 #     try:
 #         listing_id = student.createListing(
@@ -398,12 +119,12 @@ def student_login():
 @app.route("/api/listing", methods=["POST"])
 def create_listing():
     global listing_id_counter
-
+    
     try:
         json_data = request.get_json()
-
+        
         price = float(json_data["price"])
-
+        
         new_listing = {
             "id": listing_id_counter,
             "title": json_data["title"],
@@ -413,15 +134,15 @@ def create_listing():
             "category": json_data["category"],
             "image": json_data.get("image")
         }
-
+        
         listings.append(new_listing)
         listing_id_counter += 1
-
+        
         return success_response({"listingId": new_listing["id"]}, "Finally")
-
+    
     except:
         return fail_response("Something aint right")
-
+    
 
 @app.route("/api/listing/batch", methods=["POST"])
 # created in batch(may not implemented)
@@ -514,7 +235,7 @@ def tag_listing():
 def get_listings():
     try:
         category = request.args.get("category")
-
+        
         if category and category != "All":
             filtered_listings = []
             for listing in listings:
@@ -522,9 +243,9 @@ def get_listings():
                     filtered_listings.append(listing)
 
             return success_response(filtered_listings, "Got the listings")
-
+        
         return success_response(listings, "Listings retrieved successfully")
-
+        
     except:
         return fail_response("Something aint right")
 
