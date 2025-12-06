@@ -22,9 +22,11 @@ CORS(app)
 listings = []
 listing_id_counter = 1
 
+# if success return data and message
 def success_response(data=None, msg="operate successfully"):
     return jsonify({"success": True, "data": data or [], "msg": msg}), 200
 
+# otherwise return msg
 def fail_response(msg="operate failed", code=400):
     return jsonify({"success": False, "msg": msg}), code
 
@@ -33,6 +35,7 @@ def fail_response(msg="operate failed", code=400):
 # These functions implement the previous behavior/logic.
 # ---------------------------
 
+# check the validity of descriptions
 def create_listing_core(student_id, title, description, price, address, category="Books", status="Available"):
     try:
         if len(str(title)) > 100:
@@ -56,11 +59,13 @@ def create_listing_core(student_id, title, description, price, address, category
         db.session.add(new_listing)
         db.session.commit()
         return new_listing.id
-    except Exception as e:
+    except:
         db.session.rollback()
+        # show error info
         app.logger.exception("create_listing_core failed")
         return None
 
+# remove those related products
 def delete_listing_core(student_id, listing_id):
     try:
         exists = db.session.execute(
@@ -76,9 +81,11 @@ def delete_listing_core(student_id, listing_id):
         return True
     except:
         db.session.rollback()
+        # shows error info
         app.logger.exception("delete_listing_core failed")
         return False
 
+# select tags
 def tag_listing_core(student_id, listing_id, tags):
     try:
         # verify ownership
@@ -110,11 +117,12 @@ def tag_listing_core(student_id, listing_id, tags):
 
         db.session.commit()
         return True
-    except Exception as e:
+    except:
         db.session.rollback()
         app.logger.exception("tag_listing_core failed")
         return False
 
+# saved products
 def save_listing_core(student_id, product_id):
     try:
         product_exists = db.session.execute(
@@ -135,11 +143,12 @@ def save_listing_core(student_id, product_id):
         db.session.add(saved)
         db.session.commit()
         return True
-    except Exception as e:
+    except:
         db.session.rollback()
         app.logger.exception("save_listing_core failed")
         return False
 
+# mark items that are pruchased
 def purchase_item_core(student_id, listing_id, payment_method=None):
     try:
         listing = db.session.execute(
@@ -164,21 +173,24 @@ def purchase_item_core(student_id, listing_id, payment_method=None):
         db.session.execute(text("DELETE FROM savedList WHERE product_id = :list_id"), {"list_id": listing_id})
         db.session.commit()
         return True
-    except Exception as e:
+    except:
         db.session.rollback()
         app.logger.exception("purchase_item_core failed")
         return False
 
+# return savedlistings
 def report_listing_core(student_id):
     try:
         res = db.session.execute(text("SELECT * FROM savedList WHERE student_id = :id"), {"id": student_id})
         return [dict(row) for row in res.mappings()]
-    except Exception as e:
+    except:
         app.logger.exception("report_listing_core failed")
         return []
 
+# send message to seller from buyer
 def send_message_core(receiver_id, sender_id, content):
     try:
+        # .scalar() means returns the value on first row and column
         sender_exists = db.session.execute(text("SELECT 1 FROM student WHERE id = :sender_id"), {"sender_id": sender_id}).scalar()
         receiver_exists = db.session.execute(text("SELECT 1 FROM student WHERE id = :receiver_id"), {"receiver_id": receiver_id}).scalar()
         if not sender_exists or not receiver_exists:
@@ -187,18 +199,19 @@ def send_message_core(receiver_id, sender_id, content):
         db.session.add(msg)
         db.session.commit()
         return msg.id
-    except Exception as e:
+    except:
         db.session.rollback()
         app.logger.exception("send_message_core failed")
         return None
 
+# search all the possible items
 def search_listings_by_keyword(keyword):
     sql = text("""
         SELECT * FROM listing 
-        WHERE title LIKE :kw OR description LIKE :kw
+        WHERE title LIKE :kewords OR description LIKE :keywords
         ORDER BY datePosted DESC
     """)
-    res = db.session.execute(sql, {"kw": f"%{keyword}%"})
+    res = db.session.execute(sql, {"keywords": f"%{keyword}%"})
     return [dict(row) for row in res.mappings()]
 
 def search_listings_by_category(category):
