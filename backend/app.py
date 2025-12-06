@@ -19,10 +19,9 @@ def success_response(data=None, msg="operate successfully"):
 def fail_response(msg="operate failed", code=400):
     return jsonify({"success": False, "msg": msg}), code
 
-# Health Check
 @app.route("/health", methods=["GET"])
 def health():
-    return {"status": "ok"}, 200
+    return jsonify(status="ok"), 200
 
 @app.route("/api/student/register", methods=["POST"])
 # studnet register
@@ -359,5 +358,8 @@ def send_message():
     msg_id = inbox.sendmessage(json_data["senderId"], json_data["content"])
     return success_response({"messageId": msg_id}, "message send successfully") if msg_id else fail_response("message send failed")
 
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
+
+
