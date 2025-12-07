@@ -285,7 +285,7 @@ def student_login_route():
 
 @app.route("/api/listing", methods=["POST"])
 def create_listing_route():
-    json_data = request.get_json()
+    json_data = request.get_json() # There is no student id from request to obtain
     app.logger.info(json_data)
 
     # Issue, we never get to account creation, so there is no student id
