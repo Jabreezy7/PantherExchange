@@ -29,7 +29,7 @@ function BuyPage() {
     setError(null);
     try {
       const response = await getListings(category);
-      setListings(response.data.data);
+      setListings(response.data);
     } catch (err) {
       console.error("Error fetching listings:", err);
       setError("Failed to load listings. Please try again.");
