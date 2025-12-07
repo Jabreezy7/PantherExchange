@@ -3,8 +3,7 @@ from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker, relationship
 from flask_sqlalchemy import SQLAlchemy
 import sqlalchemy
-
-from app import student_login
+from datetime import datetime
 
 # global session
 db=SQLAlchemy()
@@ -59,7 +58,7 @@ class Order(db.Model):
     # price, payment and order time
     price = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(256))
-    order_time = db.Column(db.DateTime, default=db.DateTime.now, nullable=False)
+    order_time = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
 # blocked user(not sure whether to implement it)
 class BlockedUser(db.Model):
@@ -76,7 +75,7 @@ class BlockedUser(db.Model):
         db.ForeignKey("student.id", ondelete="CASCADE"),
         nullable=False
     )
-    block_time = db.Column(db.DateTime, default=db.DateTime.now, nullable=False)  
+    block_time = db.Column(db.DateTime, default=datetime.now, nullable=False)  
     # we can't block same user multiple times when it is blocked
     __table_args__ = (UniqueConstraint('student_id', 'blocked_id', name='_student_blocked_uc'),)
 
@@ -103,7 +102,7 @@ class Message(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey("student.id", ondelete="CASCADE"), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey("student.id", ondelete="CASCADE"), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    timeStamp = db.Column(db.DateTime, default=db.DateTime.now)
+    timeStamp = db.Column(db.DateTime, default=datetime.now)
 
 class Listing(db.Model):
     __tablename__ = "listing"
@@ -113,8 +112,8 @@ class Listing(db.Model):
     price = db.Column(db.Float, nullable=False)
     sellerName = db.Column(db.String(50), nullable=True, default=" ")
     address = db.Column(db.String(100))
-    datePosted = db.Column(db.DateTime, default=db.DateTime.now)
-    images = db.Column(db.Json, default=[])
+    datePosted = db.Column(db.DateTime, default=datetime.now)
+    images = db.Column(db.JSON, default=list)
     category = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20),default="Available")
     seller = db.Column(db.Integer, db.ForeignKey("student.id"))

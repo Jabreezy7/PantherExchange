@@ -432,5 +432,10 @@ def send_message_route():
     msg_id = send_message_core(json_data["receiverId"], json_data["senderId"], json_data["content"])
     return success_response({"messageId": msg_id}, "message send successfully") if msg_id else fail_response("message send failed")
 
+# Heartbeat health message
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "OK"}), 200
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, host="0.0.0.0")
