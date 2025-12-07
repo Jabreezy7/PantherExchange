@@ -288,7 +288,7 @@ def create_listing_route():
     json_data = request.get_json() # There is no student id from request to obtain
     app.logger.info(json_data)
 
-    # Issue, we never get to account creation, so there is no student id
+    # Issue - Always fail since student id is not in request
     required = ["studentId", "title", "description", "price", "address"]
     for field in required:
         if field not in json_data or json_data[field] is None:
