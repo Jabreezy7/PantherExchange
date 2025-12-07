@@ -42,15 +42,15 @@ def create_listing_core(student_id, title, description, price, address, category
             return None
         if float(price) < 0:
             return None
-        student = Student.query.get(student_id)
-        if not student:
-            return None
+        #student = db.session.get(Student, student_id)
+        #if not student:
+            #return None
         new_listing = Listing(
             title=title,
             description=description,
             price=price,
-            sellerName=student.name,
-            seller=student.id,
+            sellerName="student.name", #removed student.name, replace with Default
+            seller="student.id",
             address=address,
             category=category,
             status=status,
@@ -294,6 +294,9 @@ def create_listing_route():
         if field not in json_data or json_data[field] is None:
             return fail_response("missing required field")
 
+    app.logger.info("Passed field check")
+
+    # Issue here, listing_id is not properly being created
     listing_id = create_listing_core(
         json_data["studentId"],
         json_data["title"],

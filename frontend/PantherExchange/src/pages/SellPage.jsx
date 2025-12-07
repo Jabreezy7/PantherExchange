@@ -28,7 +28,9 @@ function SellPage() {
         });
       }
 
+      // Added studentId: 1 to compile
       const formData = {
+        studentId: 1, 
         title,
         description,
         price: Number(price),
