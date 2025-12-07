@@ -286,6 +286,9 @@ def student_login_route():
 @app.route("/api/listing", methods=["POST"])
 def create_listing_route():
     json_data = request.get_json()
+    app.logger.info(json_data)
+
+    # Issue, we never get to account creation, so there is no student id
     required = ["studentId", "title", "description", "price", "address"]
     for field in required:
         if field not in json_data or json_data[field] is None:
@@ -300,6 +303,7 @@ def create_listing_route():
         category=json_data.get("category", "Books"),
         status=json_data.get("status", "Available")
     )
+    app.logger.info(listing_id)
     if listing_id:
         return success_response({"listingId": listing_id}, "goods create successfully")
     return fail_response("create listing failed")
@@ -438,4 +442,4 @@ def health():
     return jsonify({"status": "OK"}), 200
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, host="0.0.0.0")
+    app.run(debug=True, port=5000, host="0.0.0.0", use_reloader=False)
