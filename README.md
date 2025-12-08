@@ -3,8 +3,8 @@ CS1530 Group Project
 
 ## Infrastructure
 - Frontend: React, JSX, and Vite
-- Backend: SQL, Flask and Python
-- Database: SQL
+- Backend: Flask and Python
+- Database: SQLite
 - API/External Services: CORS
 - Deployment/Hosting: GitHub Pages
 - Containerization: Docker
