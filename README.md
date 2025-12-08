@@ -6,7 +6,7 @@ CS1530 Group Project
 - Backend: Flask and Python
 - Database: SQLite
 - API/External Services: CORS
-- Deployment/Hosting: GitHub Pages
+- Deployment/Hosting: Vercel
 - Containerization: Docker
 
 ## Execution Steps
