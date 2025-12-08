@@ -10,3 +10,8 @@ CS1530 Group Project
 ## System Shutdown Steps
 - Run the command ```./stop.sh``` 
 - This will shut down the servers
+
+## Licensing and Future Work
+- This project is available for future work and licensing
+- Fork the project for any work concerning PantherExchange
+- Please refer to the LICENSE section for the terms and conditions
