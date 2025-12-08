@@ -1,16 +1,14 @@
 import axios from "axios";
 
-const API = axios.create({
-  baseURL: "http://127.0.0.1:5001",
-});
+const API_BASE = "http://localhost:5001";
 
-export const getListings = (category) => {
-  const params = category && category !== "All" ? { category } : {};
-  return API.get("/api/listing", { params });
+export const getListings = async (category) => {
+  if(category !== "All") {
+    return axios.get(`${API_BASE}/items/?category=${encodeURIComponent(category)}`);
+  }
+  return axios.get(`${API_BASE}/items/`);
 };
 
-export const addListing = (data) => {
-  return API.post("/api/listing", data, {
-    headers: { "Content-Type": "application/json" },
-  });
-};
+export const addListing = (listingData) => {
+  return axios.post(`${API_BASE}/items/`, listingData)
+}
