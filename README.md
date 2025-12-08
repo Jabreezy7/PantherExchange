@@ -1,6 +1,14 @@
 # PantherExchange
 CS1530 Group Project
 
+## Infrastructure
+- Frontend: React, JSX, and Vite
+- Backend: SQL, Flask and Python
+- Database: SQL
+- API/External Services: CORS
+- Deployment/Hosting: GitHub Pages
+- Containerization: Docker
+
 ## Execution Steps
 
 - Make sure Docker is running in the background
